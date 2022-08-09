@@ -65,7 +65,7 @@ import java.util.regex.Pattern;
 		name = "FC Spawn Predictor",
 		description = "Determine the spawn rotations for Fight Caves",
 		tags = {"fight", "caves", "jad", "spawn", "predictor", "waves", "time", "timer", "rotation", "damen"},
-		enabledByDefault = false,
+		enabledByDefault = true,
 		loadInSafeMode = false
 )
 @Slf4j
