@@ -64,9 +64,7 @@ import java.util.regex.Pattern;
 @PluginDescriptor(
 		name = "FC Spawn Predictor",
 		description = "Determine the spawn rotations for Fight Caves",
-		tags = {"fight", "caves", "jad", "spawn", "predictor", "waves", "time", "timer", "rotation", "damen"},
-		enabledByDefault = true,
-		loadInSafeMode = false
+		tags = {"fight", "caves", "jad", "spawn", "predictor", "waves", "time", "timer", "rotation", "damen"}
 )
 @Slf4j
 public class SpawnPredictorPlugin extends Plugin implements KeyListener

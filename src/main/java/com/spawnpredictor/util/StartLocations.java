@@ -98,7 +98,7 @@ public enum StartLocations
 			case 15: return 7;
 		}
 
-		log.warn("Invalid Rotation Column Number -> {}", r);
+		log.debug("Invalid Rotation Column Number -> {}", r);
 		return -1;
 	}
 }
