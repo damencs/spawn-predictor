@@ -53,6 +53,7 @@ import org.apache.commons.lang3.ArrayUtils;
 import javax.inject.Inject;
 import java.awt.event.KeyEvent;
 import java.time.LocalTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
@@ -97,6 +98,16 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 
 	@Getter
 	private static List<List<FightCavesNpcSpawn>> waveData = new ArrayList<>();
+
+	@Getter
+	private LocalTime serverUTCTime;
+
+	private int serverTime = -1;
+	private int oldServerTime = -1;
+	private int serverTimeSecondOffset = 1;
+
+	@Getter
+	private boolean serverUTCTimeSecondSet = false;
 
 	@Getter
 	private int currentUTCTime;
@@ -295,26 +306,65 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 
 	public final String getUTCFormatted()
 	{
-		return getUTCTime().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+		if (serverTime == -1)
+		{
+			return "";
+		}
+
+		return serverUTCTime.format(DateTimeFormatter.ofPattern("HH:mm:ss"));
 	}
 
 	@Schedule(period = 500, unit = ChronoUnit.MILLIS)
 	public void updateSchedule()
 	{
-		if (client.getGameState() != GameState.LOGGED_IN)
+		// Server UTC Time: 2208
+		// Hour Calculation: 1328 / 60 = 22
+		// Minuted Calculation: 1328 % 60 = 8
+		if (client.getGameState() != GameState.LOGGED_IN || !isInTzhaarArea() || client.isInInstancedRegion())
 		{
+			serverUTCTime = null;
+			serverUTCTimeSecondSet = false;
+			serverTime = -1;
+			oldServerTime = -1;
+			serverTimeSecondOffset = -1;
 			return;
 		}
 
-		if (!isInTzhaarArea() || client.isInInstancedRegion())
+		int currentLocalSecond = LocalTime.now().getSecond();
+		serverTime = client.getVarbitValue(8354);
+
+		if (!serverUTCTimeSecondSet)
 		{
-			return;
+			if (oldServerTime > 0 && serverTime != oldServerTime)
+			{
+				serverUTCTime = LocalTime.of(serverTime / 60, serverTime % 60, 0);
+				serverUTCTimeSecondSet = true;
+				serverTimeSecondOffset = LocalTime.now().getSecond();
+			}
+			else
+			{
+				serverUTCTime = LocalTime.of(serverTime / 60, serverTime % 60, currentLocalSecond);
+			}
+			oldServerTime = serverTime;
+		}
+		else if (serverUTCTimeSecondSet && serverTimeSecondOffset != -1)
+		{
+			oldServerTime = serverTime;
+
+			if (serverTime != oldServerTime)
+			{
+				serverUTCTime = LocalTime.of(serverTime / 60, serverTime % 60, 0);
+				serverTimeSecondOffset = LocalTime.now().getSecond();
+			}
+			else
+			{
+				serverUTCTime = LocalTime.of(serverTime / 60, serverTime % 60, OffsetDateTime.now().plusSeconds(-serverTimeSecondOffset).getSecond());
+			}
 		}
 
-		currentUTCTime = (getUTCTime().getHour() * 60) + getUTCTime().getMinute();
-		rotationCol = currentUTCTime % 16;
+		rotationCol = serverTime % 16;
 
-		int minute = getUTCTime().getMinute();
+		int minute = serverUTCTime.getMinute();
 
 		if ((rotationCol == 15 && (minute % 2) != 0) || (rotationCol == 0 && (minute % 2) == 0))
 		{

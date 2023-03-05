@@ -80,16 +80,29 @@ public class RotationOverlayPanel extends OverlayPanel
 				.right(Integer.toString(StartLocations.translateRotation(rotation)))
 				.rightColor(Color.GREEN)
 				.build());
-		panelComponent.getChildren().add(LineComponent.builder()
-				.left("Next:")
-				.leftColor(Color.WHITE)
-				.right("[T - "
-								+ (60 - plugin.getUTCTime().getSecond())
-								+ "s, Rot: "
-								+ ((rotation + 1) > 15 ? "4" : Integer.toString(StartLocations.translateRotation(rotation + 1)))
-								+ "]")
-				.rightColor(Color.YELLOW)
-				.build());
+
+		if (plugin.isServerUTCTimeSecondSet())
+		{
+			panelComponent.getChildren().add(LineComponent.builder()
+					.left("Next:")
+					.leftColor(Color.WHITE)
+					.right("[T - "
+							+ (60 - plugin.getServerUTCTime().getSecond())
+							+ "s, Rot: "
+							+ ((rotation + 1) > 15 ? "4" : Integer.toString(StartLocations.translateRotation(rotation + 1)))
+							+ "]")
+					.rightColor(Color.YELLOW)
+					.build());
+		}
+		else
+		{
+			panelComponent.getChildren().add(LineComponent.builder()
+					.left("Next:")
+					.leftColor(Color.WHITE)
+					.right("Determing...")
+					.rightColor(Color.YELLOW)
+					.build());
+		}
 
 		return super.render(graphics);
 	}
