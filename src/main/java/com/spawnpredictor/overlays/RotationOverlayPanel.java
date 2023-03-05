@@ -28,7 +28,6 @@ package com.spawnpredictor.overlays;
 import com.spawnpredictor.SpawnPredictorConfig;
 import com.spawnpredictor.SpawnPredictorPlugin;
 import com.spawnpredictor.util.StartLocations;
-import net.runelite.api.Client;
 import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.OverlayPriority;
@@ -74,15 +73,15 @@ public class RotationOverlayPanel extends OverlayPanel
 					.build());
 		}
 
-		panelComponent.getChildren().add(LineComponent.builder()
-				.left("Current Rotation:")
-				.leftColor(Color.WHITE)
-				.right(Integer.toString(StartLocations.translateRotation(rotation)))
-				.rightColor(Color.GREEN)
-				.build());
-
 		if (plugin.isServerUTCTimeSecondSet())
 		{
+			panelComponent.getChildren().add(LineComponent.builder()
+					.left("Current Rotation:")
+					.leftColor(Color.WHITE)
+					.right(Integer.toString(StartLocations.translateRotation(rotation)))
+					.rightColor(Color.GREEN)
+					.build());
+
 			panelComponent.getChildren().add(LineComponent.builder()
 					.left("Next:")
 					.leftColor(Color.WHITE)
@@ -97,8 +96,6 @@ public class RotationOverlayPanel extends OverlayPanel
 		else
 		{
 			panelComponent.getChildren().add(LineComponent.builder()
-					.left("Next:")
-					.leftColor(Color.WHITE)
 					.right("Determing...")
 					.rightColor(Color.YELLOW)
 					.build());

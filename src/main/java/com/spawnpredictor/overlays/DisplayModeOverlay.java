@@ -66,13 +66,13 @@ public class DisplayModeOverlay extends Overlay
 	@Override
 	public Dimension render(Graphics2D graphics)
 	{
-		if (!plugin.isFightCavesActive() || config.displayMode() == SpawnPredictorConfig.DisplayMode.OFF || SpawnPredictorPlugin.getCurrentWave() <= 0)
+		if (!plugin.isFightCavesActive() || config.displayMode() == SpawnPredictorConfig.DisplayMode.OFF || plugin.getCurrentWave() <= 0 || plugin.getCurrentRotation() == -1)
 		{
 			return null;
 		}
 
-		final int wave = SpawnPredictorPlugin.getCurrentWave() - 1;
-		List<FightCavesNpcSpawn> currentWaveContents = SpawnPredictorPlugin.getWaveData().get(wave);
+		final int wave = plugin.getCurrentWave() - 1;
+		List<FightCavesNpcSpawn> currentWaveContents = plugin.getWaveData().get(wave);
 
 		switch(config.displayMode())
 		{
@@ -91,7 +91,7 @@ public class DisplayModeOverlay extends Overlay
 
 				if (wave != 63)
 				{
-					renderWaveContents(graphics, SpawnPredictorPlugin.getWaveData().get(wave + 1), config.nextWaveColor());
+					renderWaveContents(graphics, plugin.getWaveData().get(wave + 1), config.nextWaveColor());
 				}
 				break;
 			}
@@ -102,7 +102,7 @@ public class DisplayModeOverlay extends Overlay
 
 				if (wave != 63)
 				{
-					renderWaveContents(graphics, SpawnPredictorPlugin.getWaveData().get(wave + 1), config.nextWaveColor());
+					renderWaveContents(graphics, plugin.getWaveData().get(wave + 1), config.nextWaveColor());
 				}
 				break;
 			}

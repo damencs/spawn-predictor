@@ -25,10 +25,12 @@
  */
 package com.spawnpredictor;
 
+import com.google.gson.Gson;
 import com.google.inject.Provides;
 import com.spawnpredictor.overlays.DebugOverlayPanel;
 import com.spawnpredictor.overlays.DisplayModeOverlay;
 import com.spawnpredictor.overlays.RotationOverlayPanel;
+import com.spawnpredictor.util.AccountMemory;
 import com.spawnpredictor.util.FightCavesNpc;
 import com.spawnpredictor.util.FightCavesNpcSpawn;
 import com.spawnpredictor.util.StartLocations;
@@ -39,6 +41,7 @@ import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.GameStateChanged;
+import net.runelite.api.events.GameTick;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
@@ -91,6 +94,12 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 	@Inject
 	private SpawnPredictorConfig config;
 
+	@Inject
+	private ConfigManager configManager;
+
+	@Inject
+	private Gson gson;
+
 	@Provides SpawnPredictorConfig providesConfig(ConfigManager configManager)
 	{
 		return configManager.getConfig(SpawnPredictorConfig.class);
@@ -113,10 +122,10 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 	private int currentUTCTime;
 
 	@Getter
-	private int rotationCol;
+	private int rotationCol = -1;
 
 	@Getter
-	private static int currentWave = -1;
+	private int currentWave = -1;
 
 	@Getter
 	private int currentRotation = -1;
@@ -128,6 +137,8 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 	private boolean hotkeyEnabled = false;
 
 	private boolean active = false; // This boolean is required because of loading lines
+
+	private boolean confirmedReset = false;
 
 	private final Pattern WAVE_PATTERN = Pattern.compile(".*Wave: (\\d+).*");
 
@@ -193,45 +204,108 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 	}
 
 	@Subscribe
+	private void onGameTick(GameTick event)
+	{
+		if (!isFightCavesActive() && !confirmedReset && (isInTzhaarArea() || !client.isInInstancedRegion()))
+		{
+			if (client.getLocalPlayer() != null)
+			{
+				if (getRotationConfig(client.getLocalPlayer().getName()) != null)
+				{
+					removeRotationConfig(client.getLocalPlayer().getName());
+				}
+
+				confirmedReset = true;
+			}
+		}
+	}
+
+	@Subscribe
 	private void onGameStateChanged(GameStateChanged event)
 	{
 		if (event.getGameState() != GameState.LOGGED_IN)
 		{
+			if (event.getGameState() == GameState.HOPPING || event.getGameState() == GameState.LOGIN_SCREEN)
+			{
+				reset();
+				confirmedReset = false;
+			}
 			return;
 		}
 
 		if (isFightCavesActive() && !active)
 		{
-			currentRotation = StartLocations.translateRotation(rotationCol);
+			AccountMemory memory = getRotationConfig(client.getLocalPlayer().getName());
+			if (memory != null)
+			{
+				rotationCol = memory.getRotation();
+				currentRotation = StartLocations.translateRotation(rotationCol);
+				currentWave = memory.getWave();
+			}
+			else
+			{
+				currentRotation = StartLocations.translateRotation(rotationCol);
+				currentWave = 1; // Should fix not displaying 'Wave 1' before seeing the 1st wave chat message
+			}
+
+			if (rotationCol == -1 || currentRotation == -1)
+			{
+				return;
+			}
+
 			rsVal = StartLocations.getLookupMap().get(currentRotation);
 			updateWaveData(rsVal);
-			currentWave = 1; // Should fix not displaying 'Wave 1' before seeing the 1st wave chat message
 			active = true;
 		}
 		else if (!isFightCavesActive())
 		{
 			reset();
+			removeRotationConfig(client.getLocalPlayer().getName());
 		}
 	}
 
 	@Subscribe
 	private void onChatMessage(ChatMessage event)
 	{
-		final Matcher waveMatcher = WAVE_PATTERN.matcher(event.getMessage());
-
-		if (event.getType() != ChatMessageType.GAMEMESSAGE
-				|| !isFightCavesActive()
-				|| !waveMatcher.matches())
+		if (event.getType() != ChatMessageType.GAMEMESSAGE)
 		{
 			return;
 		}
 
-		currentWave = Integer.parseInt(waveMatcher.group(1));
-
-		if (currentRotation == 7 && currentWave == 3)
+		if (event.getMessage().contains("Your TzTok-Jad kill count"))
 		{
-			rsVal = 11; // Different spawn points on the spawn wheel for Wave 4+
-			updateWaveData(rsVal);
+			removeRotationConfig(client.getLocalPlayer().getName());
+			return;
+		}
+
+		if (isFightCavesActive() && getCurrentRotation() != -1)
+		{
+			if (event.getMessage().contains("The Fight Cave has been paused."))
+			{
+				currentWave++;
+				saveRotation(client.getLocalPlayer().getName(), rotationCol, currentWave);
+				return;
+			}
+
+			final Matcher waveMatcher = WAVE_PATTERN.matcher(event.getMessage());
+
+			if (!waveMatcher.matches())
+			{
+				return;
+			}
+
+			currentWave = Integer.parseInt(waveMatcher.group(1));
+
+			if (currentWave != 0)
+			{
+				saveRotation(client.getLocalPlayer().getName(), rotationCol, currentWave);
+			}
+
+			if (currentRotation == 7 && currentWave == 3)
+			{
+				rsVal = 11; // Different spawn points on the spawn wheel for Wave 4+
+				updateWaveData(rsVal);
+			}
 		}
 	}
 
@@ -345,6 +419,7 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 			{
 				serverUTCTime = LocalTime.of(serverTime / 60, serverTime % 60, currentLocalSecond);
 			}
+
 			oldServerTime = serverTime;
 		}
 		else if (serverUTCTimeSecondSet && serverTimeSecondOffset != -1)
@@ -362,19 +437,22 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 			}
 		}
 
-		rotationCol = serverTime % 16;
-
-		int minute = serverUTCTime.getMinute();
-
-		if ((rotationCol == 15 && (minute % 2) != 0) || (rotationCol == 0 && (minute % 2) == 0))
+		if (!active && serverUTCTimeSecondSet)
 		{
-			// Needed in-order to make Rotation 4 (Column 1 and 16) repeat itself
-			rotationCol = 1;
-		}
-		else
-		{
-			// Because of the modulo above, everything is 1 value lower than it should be ... so +1 to every rotation
-			rotationCol++;
+			rotationCol = serverTime % 16;
+
+			int minute = serverUTCTime.getMinute();
+
+			if ((rotationCol == 15 && (minute % 2) != 0) || (rotationCol == 0 && (minute % 2) == 0))
+			{
+				// Needed in-order to make Rotation 4 (Column 1 and 16) repeat itself
+				rotationCol = 1;
+			}
+			else
+			{
+				// Because of the modulo above, everything is 1 value lower than it should be ... so +1 to every rotation
+				rotationCol++;
+			}
 		}
 	}
 
@@ -414,5 +492,40 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 		{
 			hotkeyEnabled = false;
 		}
+	}
+
+	private void saveRotation(String name, int rotation, int wave)
+	{
+		AccountMemory memory = new AccountMemory(rotation, wave);
+		setRotationConfig(name, memory);
+	}
+
+	AccountMemory getRotationConfig(String name)
+	{
+		String json = configManager.getConfiguration(SpawnPredictorConfig.GROUP, "spawnpredictor_" + name);
+
+		if (json == null)
+		{
+			return null;
+		}
+
+		return gson.fromJson(json, AccountMemory.class);
+	}
+
+	void setRotationConfig(String name, AccountMemory memory)
+	{
+		String json = gson.toJson(memory);
+		configManager.setConfiguration(SpawnPredictorConfig.GROUP, "spawnpredictor_" + name, json);
+		log.info("spawnpredictor: set rotation config for {} with rotation: {} and wave: {}", name, memory.getRotation(), memory.getWave());
+	}
+
+	void removeRotationConfig(String name)
+	{
+		if (name == null)
+		{
+			return;
+		}
+		configManager.unsetConfiguration(SpawnPredictorConfig.GROUP, "spawnpredictor_" + name);
+		log.info("spawnpredictor: removed rotation config for {}", name);
 	}
 }

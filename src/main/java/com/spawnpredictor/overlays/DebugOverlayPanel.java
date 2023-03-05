@@ -29,7 +29,6 @@ import com.google.inject.Inject;
 import com.spawnpredictor.SpawnPredictorConfig;
 import com.spawnpredictor.SpawnPredictorPlugin;
 import com.spawnpredictor.util.StartLocations;
-import net.runelite.api.Client;
 import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.OverlayPriority;
@@ -88,7 +87,7 @@ public class DebugOverlayPanel extends OverlayPanel
 			panelComponent.getChildren().add(LineComponent.builder()
 					.left("Wave:")
 					.leftColor(Color.WHITE)
-					.right(Integer.toString(SpawnPredictorPlugin.getCurrentWave()))
+					.right(Integer.toString(plugin.getCurrentWave()))
 					.rightColor(Color.GREEN)
 					.build());
 

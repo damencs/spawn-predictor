@@ -25,6 +25,7 @@
  */
 package com.spawnpredictor;
 
+import com.google.gson.Gson;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import net.runelite.client.config.*;
@@ -34,6 +35,8 @@ import java.awt.*;
 @ConfigGroup("spawnpredictor")
 public interface SpawnPredictorConfig extends Config
 {
+	String GROUP = "spawnpredictor";
+
 	@ConfigItem(
 			name = "Debug",
 			keyName = "debugOverlay",
@@ -149,6 +152,18 @@ public interface SpawnPredictorConfig extends Config
 	default Color nextWaveColor()
 	{
 		return Color.GREEN;
+	}
+
+	@ConfigItem(
+			name = "Account Memory",
+			keyName = "accountMemory",
+			description = "Handles storing rotation and waves on logout",
+			position = 99,
+			hidden = true
+	)
+	default Gson accountMemory()
+	{
+		return null;
 	}
 
 	@RequiredArgsConstructor
