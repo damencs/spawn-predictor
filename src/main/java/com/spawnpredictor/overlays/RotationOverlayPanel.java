@@ -96,7 +96,7 @@ public class RotationOverlayPanel extends OverlayPanel
 		else
 		{
 			panelComponent.getChildren().add(LineComponent.builder()
-					.right("Determing...")
+					.right("Determining...")
 					.rightColor(Color.YELLOW)
 					.build());
 		}
