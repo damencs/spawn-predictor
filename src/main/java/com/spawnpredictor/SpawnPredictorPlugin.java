@@ -521,10 +521,11 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 
 	void removeRotationConfig(String name)
 	{
-		if (name == null)
+		if (name == null || getRotationConfig(name) == null)
 		{
 			return;
 		}
+
 		configManager.unsetConfiguration(SpawnPredictorConfig.GROUP, "spawnpredictor_" + name);
 		log.info("spawnpredictor: removed rotation config for {}", name);
 	}
