@@ -92,6 +92,10 @@ public class RotationOverlayPanel extends OverlayPanel
 							+ "]")
 					.rightColor(Color.YELLOW)
 					.build());
+
+			panelComponent.setPreferredSize(new Dimension(
+					135,
+					0));
 		}
 		else
 		{
