@@ -50,25 +50,14 @@ public interface SpawnPredictorConfig extends Config
 	}
 
 	@ConfigItem(
-			name = "Lobby Rotation Info",
-			keyName = "lobbyRotationInfoOverlay",
-			description = "- Displays information about the current/upcoming rotation in the lobby area",
-			position = 1
-	)
-	default boolean lobbyRotationInfoOverlay()
-	{
-		return false;
-	}
-
-	@ConfigItem(
-			name = "Include UTC Time",
-			keyName = "includeUTCTime",
-			description = "- Display the UTC Time within the overlay",
+			name = "Display Entrance Label",
+			keyName = "displayEntranceLabel",
+			description = "- Displays the label on the Fight Caves Entrance",
 			position = 2
 	)
-	default boolean includeUTCTime()
+	default boolean displayEntranceLabel()
 	{
-		return false;
+		return true;
 	}
 
 	@ConfigItem(
@@ -79,7 +68,7 @@ public interface SpawnPredictorConfig extends Config
 	)
 	default DisplayMode displayMode()
 	{
-		return DisplayMode.OFF;
+		return DisplayMode.BOTH;
 	}
 
 	@ConfigItem(

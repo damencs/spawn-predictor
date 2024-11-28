@@ -27,70 +27,64 @@ package com.spawnpredictor.overlays;
 
 import com.spawnpredictor.SpawnPredictorConfig;
 import com.spawnpredictor.SpawnPredictorPlugin;
-import com.spawnpredictor.util.StartLocations;
-import net.runelite.client.ui.overlay.OverlayPanel;
+import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.Point;
+import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.OverlayPriority;
-import net.runelite.client.ui.overlay.components.LineComponent;
+import net.runelite.client.ui.overlay.OverlayUtil;
 
 import javax.inject.Inject;
 import java.awt.*;
 
-public class RotationOverlayPanel extends OverlayPanel
+@Slf4j
+public class SpawnPredictorOverlay extends Overlay
 {
 	private final SpawnPredictorPlugin plugin;
 	private final SpawnPredictorConfig config;
 
 	@Inject
-	private RotationOverlayPanel(SpawnPredictorPlugin plugin, SpawnPredictorConfig config)
+	private SpawnPredictorOverlay(SpawnPredictorPlugin plugin, SpawnPredictorConfig config)
 	{
 		this.plugin = plugin;
 		this.config = config;
 
 		setPriority(OverlayPriority.HIGH);
-		setPosition(OverlayPosition.ABOVE_CHATBOX_RIGHT);
+		setPosition(OverlayPosition.DYNAMIC);
 	}
 
 	@Override
 	public Dimension render(Graphics2D graphics)
 	{
-		if (!plugin.isInTzhaarArea())
+		if (!plugin.isInTzhaarArea() || plugin.getEntrance() == null)
 		{
 			return null;
 		}
 
-		int rotation = plugin.getRotationCol();
-
-		panelComponent.setPreferredSize(new Dimension(135, 0));
-
-		int serverTimeSeconds = plugin.getServerUTCTime().getSecond();
-		boolean activeSafetyNet = plugin.isActiveSafetyNet();
-
-		if (plugin.isServerUTCTimeSecondSet())
+		if (config.displayEntranceLabel())
 		{
-			panelComponent.getChildren().add(LineComponent.builder()
-					.left("Current Rotation:")
-					.leftColor(Color.WHITE)
-					.right(StartLocations.translateRotation(rotation) + ((activeSafetyNet) ? "*" : ""))
-					.rightColor(activeSafetyNet ? Color.ORANGE : Color.GREEN)
-					.build());
+			String text;
+			Color textColor;
 
-			panelComponent.getChildren().add(LineComponent.builder()
-					.left("Next:")
-					.leftColor(Color.WHITE)
-					.right((activeSafetyNet ? "" : "T - " + (60 - serverTimeSeconds) + "s, ")
-							+ "Rot: " + ((rotation + 1) > 15 ? "4" : Integer.toString(StartLocations.translateRotation(rotation + 1))))
-					.rightColor(Color.YELLOW)
-					.build());
-		}
-		else
-		{
-			panelComponent.getChildren().add(LineComponent.builder()
-					.right("Determining...")
-					.rightColor(Color.YELLOW)
-					.build());
+			if (!plugin.isServerUTCTimeSecondSet() || plugin.isActiveSafetyNet())
+			{
+				text = "Please wait for the plugin to " + (plugin.isActiveSafetyNet() ? "confirm" : "determine") + " the rotation.";
+				textColor = Color.YELLOW;
+			}
+			else
+			{
+				text = "You may proceed into the Fight Caves.";
+				textColor = Color.GREEN;
+			}
+
+			Point textLocation = plugin.getEntrance().getCanvasTextLocation(graphics, text, 0);
+
+			if (textLocation != null)
+			{
+				OverlayUtil.renderTextLocation(graphics, new Point(textLocation.getX(), textLocation.getY()), text, textColor);
+			}
 		}
 
-		return super.render(graphics);
+		return null;
 	}
 }
