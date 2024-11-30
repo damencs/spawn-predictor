@@ -30,6 +30,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.Map;
 
 @Getter
 @Slf4j
@@ -52,25 +53,45 @@ public enum StartLocations
 	ROTATION_15(15, 4);
 
 	// r = Rotation Column Number (See -> translateRotation)
-	private final int r;
+	private final int rotation;
 
 	// rsVal = Rotation Start Value (Where the first Bat will spawn) based off the spawn circle -> https://imgur.com/a/EOfNGEa
-	private final int rsVal;
+	private final int rotationStartValue;
 
 	@Getter
 	private static final HashMap<Integer, Integer> lookupMap;
+
+	@Getter
+	private static final Map<Integer, Integer> rotationResolver = Map.ofEntries(
+			// Rotation Column Number, Rotation Number
+			Map.entry(1, 4),
+			Map.entry(2, 2),
+			Map.entry(3, 9),
+			Map.entry(4, 11),
+			Map.entry(5, 13),
+			Map.entry(6, 1),
+			Map.entry(7, 6),
+			Map.entry(8, 15),
+			Map.entry(9, 10),
+			Map.entry(10, 8),
+			Map.entry(11, 5),
+			Map.entry(12, 3),
+			Map.entry(13, 12),
+			Map.entry(14, 14),
+			Map.entry(15, 7)
+	);
 
 	static
 	{
 		lookupMap = new HashMap<>();
 
-		EnumSet.allOf(StartLocations.class).forEach(n -> lookupMap.put(n.getR(), n.getRsVal()));
+		EnumSet.allOf(StartLocations.class).forEach(n -> lookupMap.put(n.getRotation(), n.getRotationStartValue()));
 	}
 
-	StartLocations(int r, int rsVal)
+	StartLocations(int rotation, int rotationStartValue)
 	{
-		this.r = r;
-		this.rsVal = rsVal;
+		this.rotation = rotation;
+		this.rotationStartValue = rotationStartValue;
 	}
 
 	/**
@@ -79,26 +100,24 @@ public enum StartLocations
 	 */
 	public static int translateRotation(int r)
 	{
-		switch (r)
+		return translateRotation(r, false);
+	}
+
+	public static int translateRotation(int r, boolean reverseLookup)
+	{
+		if (r == -1)
 		{
-			case 1: return 4;
-			case 2: return 2;
-			case 3: return 9;
-			case 4: return 11;
-			case 5: return 13;
-			case 6: return 1;
-			case 7: return 6;
-			case 8: return 15;
-			case 9: return 10;
-			case 10: return 8;
-			case 11: return 5;
-			case 12: return 3;
-			case 13: return 12;
-			case 14: return 14;
-			case 15: return 7;
+			log.debug("Rotation not valid to translate, r: {}", r);
+			return -1;
 		}
 
-		log.debug("Invalid Rotation Column Number -> {}", r);
-		return -1;
+		if (!reverseLookup)
+		{
+			return rotationResolver.get(r);
+		}
+		else
+		{
+			return rotationResolver.entrySet().stream().filter(entry -> entry.getValue().equals(r)).map(Map.Entry::getKey).findFirst().orElse(-1);
+		}
 	}
 }

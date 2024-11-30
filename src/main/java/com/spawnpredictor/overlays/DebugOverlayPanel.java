@@ -39,13 +39,11 @@ import java.awt.*;
 public class DebugOverlayPanel extends OverlayPanel
 {
 	private final SpawnPredictorPlugin plugin;
-	private final SpawnPredictorConfig config;
 
 	@Inject
 	private DebugOverlayPanel(SpawnPredictorPlugin plugin, SpawnPredictorConfig config)
 	{
 		this.plugin = plugin;
-		this.config = config;
 
 		setPriority(OverlayPriority.HIGH);
 		setPosition(OverlayPosition.ABOVE_CHATBOX_RIGHT);
@@ -54,10 +52,8 @@ public class DebugOverlayPanel extends OverlayPanel
 	@Override
 	public Dimension render(Graphics2D graphics)
 	{
-		if (!config.debug())
-		{
+		if (true)
 			return null;
-		}
 
 		panelComponent.setPreferredSize(new Dimension(75, 0));
 

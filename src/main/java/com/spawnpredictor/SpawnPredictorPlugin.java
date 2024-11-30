@@ -157,17 +157,20 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 
 	private final Pattern WAVE_PATTERN = Pattern.compile(".*Wave: (\\d+).*");
 	private static final String SET_ROTATION_COMMAND = "setrotation";
-	private static final String SET_WAVE_COMMAND = "setwave";
 
 	@Getter
 	private GameObject entrance;
 	private static final int FIGHT_CAVES_ENTRANCE = 11833;
 
 	private boolean assistanceProvided;
+	private boolean runLegacyConfigCheck = false;
+
+	@Getter
+	private int desiredRotation = -1;
 
 	public boolean isFightCavesActive()
 	{
-		return ArrayUtils.contains(client.getMapRegions(), 9551) && client.isInInstancedRegion();
+		return ArrayUtils.contains(client.getMapRegions(), 9551);
 	}
 
 	public boolean isInTzhaarArea()
@@ -184,6 +187,8 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 		overlayManager.add(debugOverlayPanel);
 
 		keyManager.registerKeyListener(this);
+
+		desiredRotation = config.desiredRotation();
 	}
 
 	@Override
@@ -225,6 +230,13 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 					hotkeyEnabled = false;
 					break;
 				}
+
+				case "desiredRotation":
+				{
+					if (event.getNewValue() != null)
+						desiredRotation = Integer.parseInt(event.getNewValue());
+					break;
+				}
 			}
 		}
 	}
@@ -248,13 +260,19 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 	@Subscribe
 	private void onGameTick(GameTick event)
 	{
+		if (!runLegacyConfigCheck && client.getLocalPlayer().getName() != null)
+		{
+			processLegacyAccountMemories(client.getLocalPlayer().getName());
+			runLegacyConfigCheck = true;
+		}
+
 		if (!isFightCavesActive() && !confirmedReset && (isInTzhaarArea() || !client.isInInstancedRegion()))
 		{
 			if (client.getLocalPlayer() != null)
 			{
-				if (getRotationConfig(client.getLocalPlayer().getName()) != null)
+				if (getRotationConfig() != null)
 				{
-					removeRotationConfig(client.getLocalPlayer().getName());
+					removeRotationConfig();
 				}
 
 				confirmedReset = true;
@@ -271,15 +289,24 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 			{
 				reset();
 				confirmedReset = false;
+				runLegacyConfigCheck = false;
 			}
+
 			return;
+		}
+
+		if (!runLegacyConfigCheck && client.getLocalPlayer().getName() != null)
+		{
+			processLegacyAccountMemories(client.getLocalPlayer().getName());
+			runLegacyConfigCheck = true;
 		}
 
 		if (isFightCavesActive() && !active)
 		{
-			AccountMemory memory = getRotationConfig(client.getLocalPlayer().getName());
+			AccountMemory memory = getRotationConfig();
 			if (memory != null)
 			{
+				log.info("spawnpredictor: set rotation ({}) and wave ({}) based on account memory from {}", memory.getRotation(), memory.getWave(), configManager.getRSProfileKey());
 				rotationCol = memory.getRotation();
 				currentRotation = StartLocations.translateRotation(rotationCol);
 				currentWave = memory.getWave();
@@ -297,7 +324,10 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 
 			if (rotationCol == -1 || currentRotation == -1)
 			{
-				runAssistance("The Spawn Predictor is not set.");
+				if (runLegacyConfigCheck)
+				{
+					runAssistance("The Spawn Predictor is not set.");
+				}
 				return;
 			}
 
@@ -308,7 +338,7 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 		else if (!isFightCavesActive())
 		{
 			reset();
-			removeRotationConfig(client.getLocalPlayer().getName());
+			removeRotationConfig();
 		}
 	}
 
@@ -322,7 +352,7 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 
 		if (event.getMessage().contains("Your TzTok-Jad kill count"))
 		{
-			removeRotationConfig(client.getLocalPlayer().getName());
+			removeRotationConfig();
 			return;
 		}
 
@@ -333,13 +363,13 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 				if (getCurrentRotation() != -1)
 				{
 					currentWave++;
-					saveRotation(client.getLocalPlayer().getName(), rotationCol, currentWave);
+					saveRotation(rotationCol, currentWave);
 					return;
 				}
 				else
 				{
 					// Safety net to not preload existing saved rotation if reset/non-existent and pausing
-					removeRotationConfig(client.getLocalPlayer().getName());
+					removeRotationConfig();
 				}
 			}
 
@@ -356,7 +386,7 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 			{
 				if (currentWave != 0)
 				{
-					saveRotation(client.getLocalPlayer().getName(), rotationCol, currentWave);
+					saveRotation(rotationCol, currentWave);
 				}
 
 				if (currentRotation == 7 && currentWave == 3)
@@ -401,7 +431,7 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 
 		if (currentWave != -1)
 		{
-			saveRotation(client.getLocalPlayer().getName(), rotationCol, currentWave);
+			saveRotation(rotationCol, currentWave);
 		}
 	}
 
@@ -600,15 +630,36 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 		}
 	}
 
-	private void saveRotation(String name, int rotation, int wave)
+	private void processLegacyAccountMemories(String playerName)
 	{
-		AccountMemory memory = new AccountMemory(rotation, wave);
-		setRotationConfig(name, memory);
+		String json = configManager.getConfiguration(SpawnPredictorConfig.GROUP, "spawnpredictor_" + playerName);
+
+		// If there is a legacy account memory established, generate a new memory for the RSProfile setup.
+		if (json != null)
+		{
+			log.info("spawnpredictor: Located legacy account memory configuration for {}", playerName);
+
+			AccountMemory accountMemory = gson.fromJson(json, AccountMemory.class);
+
+			// Save new RSProfile configuration
+			saveRotation(accountMemory.getRotation(), accountMemory.getWave());
+
+			// Remove old memory configuration
+			configManager.unsetConfiguration(SpawnPredictorConfig.GROUP, "spawnpredictor_" + playerName);
+
+			log.info("spawnpredictor: Removed legacy account memory configuration for {}", playerName);
+		}
 	}
 
-	private AccountMemory getRotationConfig(String name)
+	private void saveRotation(int rotation, int wave)
 	{
-		String json = configManager.getConfiguration(SpawnPredictorConfig.GROUP, "spawnpredictor_" + name);
+		AccountMemory memory = new AccountMemory(rotation, wave);
+		setRotationConfig(memory);
+	}
+
+	private AccountMemory getRotationConfig()
+	{
+		String json = configManager.getRSProfileConfiguration(SpawnPredictorConfig.GROUP, "spawnpredictor");
 
 		if (json == null)
 		{
@@ -618,22 +669,20 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 		return gson.fromJson(json, AccountMemory.class);
 	}
 
-	private void setRotationConfig(String name, AccountMemory memory)
+	private void setRotationConfig(AccountMemory memory)
 	{
 		String json = gson.toJson(memory);
-		configManager.setConfiguration(SpawnPredictorConfig.GROUP, "spawnpredictor_" + name, json);
-		log.info("spawnpredictor: set rotation config for {} with rotation: {} and wave: {}", name, memory.getRotation(), memory.getWave());
+		configManager.setRSProfileConfiguration(SpawnPredictorConfig.GROUP, "spawnpredictor", json);
+		log.info("spawnpredictor: set rotation config for {} with rotation: {} and wave: {}", configManager.getRSProfileKey(), memory.getRotation(), memory.getWave());
 	}
 
-	private void removeRotationConfig(String name)
+	private void removeRotationConfig()
 	{
-		if (name == null || getRotationConfig(name) == null)
+		if (configManager.getRSProfileConfiguration(SpawnPredictorConfig.GROUP, "spawnpredictor") != null)
 		{
-			return;
+			configManager.unsetRSProfileConfiguration(SpawnPredictorConfig.GROUP, "spawnpredictor");
+			log.info("spawnpredictor: removed rotation config for {}", configManager.getRSProfileKey());
 		}
-
-		configManager.unsetConfiguration(SpawnPredictorConfig.GROUP, "spawnpredictor_" + name);
-		log.info("spawnpredictor: removed rotation config for {}", name);
 	}
 
 	private void runAssistance(String message)
@@ -644,7 +693,7 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 
 		if (isFightCavesActive())
 		{
-			queueChatMessage(message + " Please use '::setrotation {#1-15}' as needed.");
+			queueChatMessage(message + " Please use '::setrotation [1-15]' as needed.");
 			queueChatMessage("The wiki can be used to determine what rotation you are on. (Ref: 'Rotations')");
 			assistanceProvided = true;
 		}

@@ -38,16 +38,24 @@ public interface SpawnPredictorConfig extends Config
 	String GROUP = "spawnpredictor";
 
 	@ConfigItem(
-			name = "Debug",
-			keyName = "debugOverlay",
-			description = "",
-			position = 0,
-			hidden = true
+			name = "Display Desired Rotation",
+			keyName = "displayDesiredRotation",
+			description = "- Enables the display of the desired rotation in the Lobby Overlay",
+			position = 0
 	)
-	default boolean debug()
+	default boolean displayDesiredRotation()
 	{
-		return false;
+		return true;
 	}
+
+	@ConfigItem(
+			name = "Desired Rotation",
+			keyName = "desiredRotation",
+			description = "- Sets the desired rotation value to display",
+			position = 1
+	)
+	@Range(min = 1, max = 15)
+	default int desiredRotation() { return 5; }
 
 	@ConfigItem(
 			name = "Display Entrance Label",

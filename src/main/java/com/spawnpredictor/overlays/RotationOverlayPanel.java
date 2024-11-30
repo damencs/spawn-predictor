@@ -61,13 +61,14 @@ public class RotationOverlayPanel extends OverlayPanel
 
 		int rotation = plugin.getRotationCol();
 
-		panelComponent.setPreferredSize(new Dimension(135, 0));
-
-		int serverTimeSeconds = plugin.getServerUTCTime().getSecond();
 		boolean activeSafetyNet = plugin.isActiveSafetyNet();
 
 		if (plugin.isServerUTCTimeSecondSet())
 		{
+			panelComponent.setPreferredSize(new Dimension(135, 0));
+
+			int serverTimeSeconds = plugin.getServerUTCTime().getSecond();
+
 			panelComponent.getChildren().add(LineComponent.builder()
 					.left("Current Rotation:")
 					.leftColor(Color.WHITE)
@@ -82,9 +83,26 @@ public class RotationOverlayPanel extends OverlayPanel
 							+ "Rot: " + ((rotation + 1) > 15 ? "4" : Integer.toString(StartLocations.translateRotation(rotation + 1))))
 					.rightColor(Color.YELLOW)
 					.build());
+
+			if (config.displayDesiredRotation())
+			{
+				int currentRotationCol = plugin.getRotationCol();
+				int desiredRotation = StartLocations.translateRotation(plugin.getDesiredRotation(), true);
+
+				panelComponent.getChildren().add(LineComponent.builder()
+						.left("Desired:")
+						.leftColor(Color.WHITE)
+						.right(config.desiredRotation() + " - ETA: "
+								+ (plugin.getRotationCol() <= desiredRotation ? desiredRotation - currentRotationCol : ((15 - currentRotationCol) + desiredRotation))
+								+ "min")
+						.rightColor(Color.PINK)
+						.build());
+			}
 		}
 		else
 		{
+			panelComponent.setPreferredSize(new Dimension(85, 0));
+
 			panelComponent.getChildren().add(LineComponent.builder()
 					.right("Determining...")
 					.rightColor(Color.YELLOW)
