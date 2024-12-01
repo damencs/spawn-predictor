@@ -89,9 +89,17 @@ public class DisplayModeOverlay extends Overlay
 					renderWaveContents(graphics, currentWaveContents, config.currentWaveColor());
 				}
 
-				if (wave != 63)
+				if (wave < 62)
 				{
-					renderWaveContents(graphics, plugin.getWaveData().get(wave + 1), config.nextWaveColor());
+					List<FightCavesNpcSpawn> nextWaveContents = plugin.getWaveData().get(wave + 1);
+					if (nextWaveContents != null)
+					{
+						renderWaveContents(graphics, nextWaveContents, config.nextWaveColor());
+					}
+				}
+				else if (wave == 63)
+				{
+					renderWaveContents(graphics, currentWaveContents, config.currentWaveColor());
 				}
 				break;
 			}
@@ -100,9 +108,13 @@ public class DisplayModeOverlay extends Overlay
 			{
 				renderWaveContents(graphics, currentWaveContents, config.currentWaveColor());
 
-				if (wave != 63)
+				if (wave < 62)
 				{
-					renderWaveContents(graphics, plugin.getWaveData().get(wave + 1), config.nextWaveColor());
+					List<FightCavesNpcSpawn> nextWaveContents = plugin.getWaveData().get(wave + 1);
+					if (nextWaveContents != null)
+					{
+						renderWaveContents(graphics, nextWaveContents, config.nextWaveColor());
+					}
 				}
 				break;
 			}
