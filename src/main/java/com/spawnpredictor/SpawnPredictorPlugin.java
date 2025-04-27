@@ -424,8 +424,8 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 			return;
 		}
 
-		rotationCol = value;
-		currentRotation = StartLocations.translateRotation(rotationCol);
+		currentRotation = value;
+		rotationCol = StartLocations.translateRotation(currentRotation, true);
 		updateWaveData(StartLocations.getLookupMap().get(currentRotation));
 		queueChatMessage("You have set the rotation to " + value + ".");
 
