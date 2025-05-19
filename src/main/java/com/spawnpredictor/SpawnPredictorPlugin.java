@@ -152,6 +152,7 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 	private boolean hotkeyEnabled = false;
 
 	private boolean active = false; // This boolean is required because of loading lines
+	private boolean gameStateSecondaryCheck = false; // This is used for logging in and having an instanced loaded
 
 	private boolean confirmedReset = false;
 
@@ -170,12 +171,12 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 
 	public boolean isFightCavesActive()
 	{
-		return ArrayUtils.contains(client.getMapRegions(), 9551);
+		return ArrayUtils.contains(client.getTopLevelWorldView().getMapRegions(), 9551) && client.getTopLevelWorldView().isInstance();
 	}
 
 	public boolean isInTzhaarArea()
 	{
-		return ArrayUtils.contains(client.getMapRegions(), 9808) && !client.isInInstancedRegion();
+		return ArrayUtils.contains(client.getTopLevelWorldView().getMapRegions(), 9808) && !client.getTopLevelWorldView().isInstance();
 	}
 
 	@Override
@@ -202,6 +203,8 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 		keyManager.unregisterKeyListener(this);
 
 		reset();
+
+		gameStateSecondaryCheck = false;
 	}
 
 	private void reset()
@@ -266,7 +269,7 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 			runLegacyConfigCheck = true;
 		}
 
-		if (!isFightCavesActive() && !confirmedReset && (isInTzhaarArea() || !client.isInInstancedRegion()))
+		if (!isFightCavesActive() && !confirmedReset && (isInTzhaarArea() || !client.getTopLevelWorldView().isInstance()))
 		{
 			if (client.getLocalPlayer() != null)
 			{
@@ -290,6 +293,7 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 				reset();
 				confirmedReset = false;
 				runLegacyConfigCheck = false;
+				gameStateSecondaryCheck = false;
 			}
 
 			return;
@@ -301,44 +305,52 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 			runLegacyConfigCheck = true;
 		}
 
-		if (isFightCavesActive() && !active)
+		if (gameStateSecondaryCheck)
 		{
-			AccountMemory memory = getRotationConfig();
-			if (memory != null)
+			if (isFightCavesActive() && !active)
 			{
-				log.info("spawnpredictor: set rotation ({}) and wave ({}) based on account memory from {}", memory.getRotation(), memory.getWave(), configManager.getRSProfileKey());
-				rotationCol = memory.getRotation();
-				currentRotation = StartLocations.translateRotation(rotationCol);
-				currentWave = memory.getWave();
-			}
-			else
-			{
-				currentRotation = StartLocations.translateRotation(rotationCol);
-				currentWave = 1; // Should fix not displaying 'Wave 1' before seeing the 1st wave chat message
-			}
-
-			if (activeSafetyNet)
-			{
-				runAssistance("This rotation has not been confirmed.");
-			}
-
-			if (rotationCol == -1 || currentRotation == -1)
-			{
-				if (runLegacyConfigCheck)
+				AccountMemory memory = getRotationConfig();
+				if (memory != null)
 				{
-					runAssistance("The Spawn Predictor is not set.");
+					log.info("spawnpredictor: set rotation ({}) and wave ({}) based on account memory from {}", memory.getRotation(), memory.getWave(), configManager.getRSProfileKey());
+					rotationCol = memory.getRotation();
+					currentRotation = StartLocations.translateRotation(rotationCol);
+					currentWave = memory.getWave();
 				}
-				return;
-			}
+				else
+				{
+					currentRotation = StartLocations.translateRotation(rotationCol);
+					currentWave = 1; // Should fix not displaying 'Wave 1' before seeing the 1st wave chat message
+				}
 
-			rsVal = StartLocations.getLookupMap().get(currentRotation);
-			updateWaveData(rsVal);
-			active = true;
+				if (activeSafetyNet)
+				{
+					runAssistance("This rotation has not been confirmed.");
+				}
+
+				if (rotationCol == -1 || currentRotation == -1)
+				{
+					if (runLegacyConfigCheck)
+					{
+						runAssistance("The Spawn Predictor is not set.");
+					}
+					return;
+				}
+
+				rsVal = StartLocations.getLookupMap().get(currentRotation);
+				updateWaveData(rsVal);
+				active = true;
+			}
+			else if (!isFightCavesActive())
+			{
+				reset();
+				removeRotationConfig();
+			}
 		}
-		else if (!isFightCavesActive())
+		else
 		{
-			reset();
-			removeRotationConfig();
+			// Used to combat .isInstanced checks being false after initial login
+			gameStateSecondaryCheck = true;
 		}
 	}
 
@@ -461,7 +473,7 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 
 	private static List<List<FightCavesNpcSpawn>> calculateSpawns(int rsVal)
 	{
-		ArrayList spawns = new ArrayList<List<FightCavesNpcSpawn>>();
+		ArrayList<List<FightCavesNpcSpawn>> spawns = new ArrayList<>();
 
 		int currentCycle = rsVal;
 
@@ -474,7 +486,7 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 
 			List<List<FightCavesNpcSpawn>> subSpawns = generateSubSpawns((currentCycle + 1) % 15, npc, spawns);
 
-			ArrayList initialSpawn = new ArrayList<FightCavesNpcSpawn>();
+			ArrayList<FightCavesNpcSpawn> initialSpawn = new ArrayList<>();
 			initialSpawn.add(new FightCavesNpcSpawn(npc, currentCycle));
 			spawns.add(initialSpawn);
 			currentCycle = (currentCycle + 1) % 15;
@@ -482,14 +494,14 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 			spawns.addAll(subSpawns);
 			currentCycle = (currentCycle + subSpawns.size()) % 15;
 
-			ArrayList postSpawns = new ArrayList<FightCavesNpcSpawn>();
+			ArrayList<FightCavesNpcSpawn> postSpawns = new ArrayList<>();
 			postSpawns.add(new FightCavesNpcSpawn(npc, currentCycle));
 			postSpawns.add(new FightCavesNpcSpawn(npc, (currentCycle + 1) % 15));
 			spawns.add(postSpawns);
 			currentCycle = (currentCycle + 1) % 15;
 		}
 
-		ArrayList jadSpawn = new ArrayList<FightCavesNpcSpawn>();
+		ArrayList<FightCavesNpcSpawn> jadSpawn = new ArrayList<>();
 		jadSpawn.add(new FightCavesNpcSpawn(FightCavesNpc.JAD, currentCycle));
 		spawns.add(jadSpawn);
 
@@ -498,11 +510,11 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 
 	private static List<List<FightCavesNpcSpawn>> generateSubSpawns(int currentCycle, FightCavesNpc npc, List<List<FightCavesNpcSpawn>> existing)
 	{
-		ArrayList subSpawns = new ArrayList<List<FightCavesNpcSpawn>>();
+		ArrayList<List<FightCavesNpcSpawn>> subSpawns = new ArrayList<>();
 
 		for (List<FightCavesNpcSpawn> existingWave : existing)
 		{
-			ArrayList newSpawn = new ArrayList<FightCavesNpcSpawn>();
+			ArrayList<FightCavesNpcSpawn> newSpawn = new ArrayList<>();
 			newSpawn.add(new FightCavesNpcSpawn(npc, currentCycle));
 
 			for (int i = 0; i < existingWave.size(); i++)
@@ -539,7 +551,7 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 		// Server UTC Time: 2208
 		// Hour Calculation: 1328 / 60 = 22
 		// Minuted Calculation: 1328 % 60 = 8
-		if (client.getGameState() != GameState.LOGGED_IN || !isInTzhaarArea() || client.isInInstancedRegion())
+		if (client.getGameState() != GameState.LOGGED_IN || !isInTzhaarArea() || client.getTopLevelWorldView().isInstance())
 		{
 			serverUTCTime = null;
 			serverUTCTimeSecondSet = false;
@@ -567,7 +579,7 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 
 			oldServerTime = serverTime;
 		}
-		else if (serverUTCTimeSecondSet && serverTimeSecondOffset != -1)
+		else if (serverTimeSecondOffset != -1)
 		{
 			oldServerTime = serverTime;
 

@@ -63,7 +63,7 @@ public class RotationOverlayPanel extends OverlayPanel
 
 		boolean activeSafetyNet = plugin.isActiveSafetyNet();
 
-		if (plugin.isServerUTCTimeSecondSet())
+		if (plugin.isServerUTCTimeSecondSet() && rotation != -1)
 		{
 			panelComponent.setPreferredSize(new Dimension(135, 0));
 
