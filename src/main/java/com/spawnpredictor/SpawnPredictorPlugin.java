@@ -713,3 +713,4 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 		chatMessageManager.queue(QueuedMessage.builder().type(ChatMessageType.GAMEMESSAGE).value(message).build());
 	}
 }
+
