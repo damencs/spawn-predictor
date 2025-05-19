@@ -430,9 +430,12 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 		{
 			rsVal = 11; // Different spawn points on the spawn wheel for Wave 4+
 			updateWaveData(rsVal);
-		} else {
+		}
+		else
+		{
 			updateWaveData(StartLocations.getLookupMap().get(currentRotation));
 		}
+		
 		queueChatMessage("You have set the rotation to " + value + ".");
 
 		if (currentWave != -1)
