@@ -424,9 +424,18 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 			return;
 		}
 
-		rotationCol = value;
-		currentRotation = StartLocations.translateRotation(rotationCol);
-		updateWaveData(StartLocations.getLookupMap().get(currentRotation));
+		currentRotation = value;
+		rotationCol = StartLocations.translateRotation(currentRotation, true);
+		if (currentRotation == 7 && currentWave >= 3)
+		{
+			rsVal = 11; // Different spawn points on the spawn wheel for Wave 4+
+			updateWaveData(rsVal);
+		}
+		else
+		{
+			updateWaveData(StartLocations.getLookupMap().get(currentRotation));
+		}
+		
 		queueChatMessage("You have set the rotation to " + value + ".");
 
 		if (currentWave != -1)
@@ -704,3 +713,4 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 		chatMessageManager.queue(QueuedMessage.builder().type(ChatMessageType.GAMEMESSAGE).value(message).build());
 	}
 }
+
