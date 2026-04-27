@@ -66,10 +66,17 @@ public class SpawnPredictorOverlay extends Overlay
 			String text;
 			Color textColor;
 
-			if (!plugin.isServerUTCTimeSecondSet() || plugin.isActiveSafetyNet())
+			if (!plugin.hasServerTime())
 			{
-				text = "Please wait for the plugin to " + (plugin.isActiveSafetyNet() ? "confirm" : "determine") + " the rotation.";
+				text = "Waiting for server time...";
 				textColor = Color.YELLOW;
+			}
+			else if (plugin.isNearMinuteChange())
+			{
+				int currentRotation = com.spawnpredictor.util.StartLocations.translateRotation(plugin.getRotationCol());
+				int nextRotation = (plugin.getRotationCol() + 1) > 15 ? 4 : com.spawnpredictor.util.StartLocations.translateRotation(plugin.getRotationCol() + 1);
+				text = "Rotation " + currentRotation + ". Changing to " + nextRotation + " in " + plugin.getSecondsToMinuteChange() + "s.";
+				textColor = Color.ORANGE;
 			}
 			else
 			{
