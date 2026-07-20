@@ -30,7 +30,6 @@ import com.spawnpredictor.SpawnPredictorPlugin;
 import com.spawnpredictor.util.StartLocations;
 import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.OverlayPosition;
-import net.runelite.client.ui.overlay.OverlayPriority;
 import net.runelite.client.ui.overlay.components.LineComponent;
 
 import javax.inject.Inject;
@@ -47,7 +46,6 @@ public class RotationOverlayPanel extends OverlayPanel
 		this.plugin = plugin;
 		this.config = config;
 
-		setPriority(OverlayPriority.HIGH);
 		setPosition(OverlayPosition.ABOVE_CHATBOX_RIGHT);
 	}
 
@@ -63,11 +61,11 @@ public class RotationOverlayPanel extends OverlayPanel
 
 		boolean activeSafetyNet = plugin.isActiveSafetyNet();
 
-		if (plugin.isServerUTCTimeSecondSet() && rotation != -1)
+		if (plugin.hasServerTime() && rotation != -1)
 		{
-			panelComponent.setPreferredSize(new Dimension(135, 0));
+			panelComponent.setPreferredSize(new Dimension(165, 0));
 
-			int serverTimeSeconds = plugin.getServerUTCTime().getSecond();
+			int serverTimeSeconds = plugin.getServerSeconds();
 
 			panelComponent.getChildren().add(LineComponent.builder()
 					.left("Current Rotation:")
@@ -79,7 +77,7 @@ public class RotationOverlayPanel extends OverlayPanel
 			panelComponent.getChildren().add(LineComponent.builder()
 					.left("Next:")
 					.leftColor(Color.WHITE)
-					.right((activeSafetyNet ? "" : "T - " + (60 - serverTimeSeconds) + "s, ")
+					.right("T - " + (60 - serverTimeSeconds) + "s, "
 							+ "Rot: " + ((rotation + 1) > 15 ? "4" : Integer.toString(StartLocations.translateRotation(rotation + 1))))
 					.rightColor(Color.YELLOW)
 					.build());

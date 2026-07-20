@@ -43,6 +43,8 @@ import net.runelite.api.Client;
 import net.runelite.api.GameObject;
 import net.runelite.api.GameState;
 import net.runelite.api.events.*;
+import net.runelite.api.gameval.VarPlayerID;
+import net.runelite.api.gameval.VarbitID;
 import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.config.ConfigManager;
@@ -59,8 +61,6 @@ import org.apache.commons.lang3.ArrayUtils;
 import javax.inject.Inject;
 import java.awt.event.KeyEvent;
 import java.time.LocalTime;
-import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -118,24 +118,19 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 	private static List<List<FightCavesNpcSpawn>> waveData = new ArrayList<>();
 
 	@Getter
-	private LocalTime serverUTCTime;
-
 	private int serverTime = -1;
-	private int oldServerTime = -1;
-	private int serverTimeSecondOffset = 1;
+
+	@Getter
+	private int serverSeconds = -1;
 
 	// Since server time can become slightly off, protect the UI to assist in preventing "going in on the wrong rotation"
 	@Getter
 	boolean activeSafetyNet = false;
 
 	@Getter
-	private boolean serverUTCTimeSecondSet = false;
-
-	@Getter
-	private int currentUTCTime;
-
-	@Getter
 	private int rotationCol = -1;
+
+	private int pendingInstanceRotationCol = -1;
 
 	@Getter
 	@Setter
@@ -163,7 +158,7 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 	private GameObject entrance;
 	private static final int FIGHT_CAVES_ENTRANCE = 11833;
 
-	private boolean assistanceProvided;
+	private boolean assistanceProvided = false;
 	private boolean runLegacyConfigCheck = false;
 
 	@Getter
@@ -209,8 +204,8 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 
 	private void reset()
 	{
-		currentUTCTime = -1;
 		rotationCol = -1;
+		pendingInstanceRotationCol = -1;
 		currentWave = -1;
 		currentRotation = -1;
 		rsVal = -1;
@@ -247,12 +242,9 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 	@Subscribe
 	private void onClientTick(ClientTick event)
 	{
-		if (serverUTCTimeSecondSet)
+		if (hasServerTime())
 		{
-			int serverTimeSeconds = serverUTCTime.getSecond();
-
-			// Since server time can become slightly off, protect the UI to assist in preventing "going in on the wrong rotation"
-			activeSafetyNet = serverTimeSeconds <= 5 || serverTimeSeconds >= 55;
+			activeSafetyNet = isNearMinuteChange();
 		}
 		else
 		{
@@ -281,6 +273,11 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 				confirmedReset = true;
 			}
 		}
+
+		if (isFightCavesActive() && !active)
+		{
+			initializeFightCavesRun();
+		}
 	}
 
 	@Subscribe
@@ -307,41 +304,7 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 
 		if (gameStateSecondaryCheck)
 		{
-			if (isFightCavesActive() && !active)
-			{
-				AccountMemory memory = getRotationConfig();
-				if (memory != null)
-				{
-					log.info("spawnpredictor: set rotation ({}) and wave ({}) based on account memory from {}", memory.getRotation(), memory.getWave(), configManager.getRSProfileKey());
-					rotationCol = memory.getRotation();
-					currentRotation = StartLocations.translateRotation(rotationCol);
-					currentWave = memory.getWave();
-				}
-				else
-				{
-					currentRotation = StartLocations.translateRotation(rotationCol);
-					currentWave = 1; // Should fix not displaying 'Wave 1' before seeing the 1st wave chat message
-				}
-
-				if (activeSafetyNet)
-				{
-					runAssistance("This rotation has not been confirmed.");
-				}
-
-				if (rotationCol == -1 || currentRotation == -1)
-				{
-					if (runLegacyConfigCheck)
-					{
-						runAssistance("The Spawn Predictor is not set.");
-					}
-					return;
-				}
-
-				rsVal = StartLocations.getLookupMap().get(currentRotation);
-				updateWaveData(rsVal);
-				active = true;
-			}
-			else if (!isFightCavesActive())
+			if (!isFightCavesActive())
 			{
 				reset();
 				removeRotationConfig();
@@ -530,19 +493,14 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 		return subSpawns;
 	}
 
-	public final LocalTime getUTCTime()
-	{
-		return LocalTime.now(ZoneId.of("UTC"));
-	}
-
 	public final String getUTCFormatted()
 	{
-		if (serverTime == -1)
+		if (!hasServerTime())
 		{
 			return "";
 		}
 
-		return serverUTCTime.format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+		return LocalTime.of((serverTime / 60) % 24, serverTime % 60, serverSeconds).format(DateTimeFormatter.ofPattern("HH:mm:ss"));
 	}
 
 	@Schedule(period = 500, unit = ChronoUnit.MILLIS)
@@ -553,52 +511,18 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 		// Minuted Calculation: 1328 % 60 = 8
 		if (client.getGameState() != GameState.LOGGED_IN || !isInTzhaarArea() || client.getTopLevelWorldView().isInstance())
 		{
-			serverUTCTime = null;
-			serverUTCTimeSecondSet = false;
 			serverTime = -1;
-			oldServerTime = -1;
-			serverTimeSecondOffset = -1;
+			serverSeconds = -1;
 			return;
 		}
 
-		int currentLocalSecond = LocalTime.now().getSecond();
-		serverTime = client.getVarbitValue(8354);
+		serverTime = client.getVarpValue(VarPlayerID.DATE_MINUTES);
+		serverSeconds = client.getVarbitValue(VarbitID.DATE_SECONDS_PAST_MINUTE);
 
-		if (!serverUTCTimeSecondSet)
-		{
-			if (oldServerTime > 0 && serverTime != oldServerTime)
-			{
-				serverUTCTime = LocalTime.of(serverTime / 60, serverTime % 60, 0);
-				serverUTCTimeSecondSet = true;
-				serverTimeSecondOffset = LocalTime.now().getSecond();
-			}
-			else
-			{
-				serverUTCTime = LocalTime.of(serverTime / 60, serverTime % 60, currentLocalSecond);
-			}
-
-			oldServerTime = serverTime;
-		}
-		else if (serverTimeSecondOffset != -1)
-		{
-			oldServerTime = serverTime;
-
-			if (serverTime != oldServerTime)
-			{
-				serverUTCTime = LocalTime.of(serverTime / 60, serverTime % 60, 0);
-				serverTimeSecondOffset = LocalTime.now().getSecond();
-			}
-			else
-			{
-				serverUTCTime = LocalTime.of(serverTime / 60, serverTime % 60, OffsetDateTime.now().plusSeconds(-serverTimeSecondOffset).getSecond());
-			}
-		}
-
-		if (!active && serverUTCTimeSecondSet)
+		if (!active && hasServerTime())
 		{
 			rotationCol = serverTime % 16;
-
-			int minute = serverUTCTime.getMinute();
+			int minute = serverTime % 60;
 
 			if ((rotationCol == 15 && (minute % 2) != 0) || (rotationCol == 0 && (minute % 2) == 0))
 			{
@@ -610,7 +534,79 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 				// Because of the modulo above, everything is 1 value lower than it should be ... so +1 to every rotation
 				rotationCol++;
 			}
+
+			if (isNearMinuteChange())
+			{
+				pendingInstanceRotationCol = rotationCol;
+			}
+			else
+			{
+				pendingInstanceRotationCol = -1;
+			}
 		}
+	}
+
+	private void initializeFightCavesRun()
+	{
+		AccountMemory memory = getRotationConfig();
+		if (memory != null)
+		{
+			log.info("spawnpredictor: set rotation ({}) and wave ({}) based on account memory from {}", memory.getRotation(), memory.getWave(), configManager.getRSProfileKey());
+			rotationCol = memory.getRotation();
+			currentRotation = StartLocations.translateRotation(rotationCol);
+			currentWave = memory.getWave();
+		}
+		else
+		{
+			if (pendingInstanceRotationCol != -1 && serverSeconds >= 0 && serverSeconds < 10)
+			{
+				log.info("spawnpredictor: preserving pre-minute-change rotation ({}) for instance entry at {}s", pendingInstanceRotationCol, serverSeconds);
+				rotationCol = pendingInstanceRotationCol;
+			}
+
+			currentRotation = StartLocations.translateRotation(rotationCol);
+			currentWave = 1; // Should fix not displaying 'Wave 1' before seeing the 1st wave chat message
+		}
+
+		if (rotationCol == -1 || currentRotation == -1)
+		{
+			if (runLegacyConfigCheck)
+			{
+				runAssistance("The Spawn Predictor is not set.");
+			}
+			return;
+		}
+
+		rsVal = StartLocations.getLookupMap().get(currentRotation);
+		updateWaveData(rsVal);
+		active = true;
+		pendingInstanceRotationCol = -1;
+		runAssistance("");
+	}
+
+	public boolean hasServerTime()
+	{
+		return serverTime != -1 && serverSeconds != -1;
+	}
+
+	public boolean isNearMinuteChange()
+	{
+		if (!hasServerTime())
+		{
+			return false;
+		}
+
+		return serverSeconds >= 50;
+	}
+
+	public int getSecondsToMinuteChange()
+	{
+		if (!hasServerTime())
+		{
+			return -1;
+		}
+
+		return 60 - serverSeconds;
 	}
 
 	@Override
@@ -714,7 +710,7 @@ public class SpawnPredictorPlugin extends Plugin implements KeyListener
 
 		if (isFightCavesActive())
 		{
-			queueChatMessage(message + " Please use '::setrotation [1-15]' as needed.");
+			queueChatMessage(message + (message.isEmpty() ? "" : " ") + "Please use '::setrotation 1-15' as needed.");
 			queueChatMessage("The wiki can be used to determine what rotation you are on. (Ref: 'Rotations')");
 			assistanceProvided = true;
 		}

@@ -31,7 +31,6 @@ import com.spawnpredictor.SpawnPredictorPlugin;
 import com.spawnpredictor.util.StartLocations;
 import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.OverlayPosition;
-import net.runelite.client.ui.overlay.OverlayPriority;
 import net.runelite.client.ui.overlay.components.LineComponent;
 
 import java.awt.*;
@@ -45,7 +44,6 @@ public class DebugOverlayPanel extends OverlayPanel
 	{
 		this.plugin = plugin;
 
-		setPriority(OverlayPriority.HIGH);
 		setPosition(OverlayPosition.ABOVE_CHATBOX_RIGHT);
 	}
 
@@ -55,7 +53,7 @@ public class DebugOverlayPanel extends OverlayPanel
 		if (true)
 			return null;
 
-		panelComponent.setPreferredSize(new Dimension(75, 0));
+		panelComponent.setPreferredSize(new Dimension(150, 0));
 
 		if (!plugin.isFightCavesActive() && plugin.isInTzhaarArea())
 		{
@@ -73,6 +71,20 @@ public class DebugOverlayPanel extends OverlayPanel
 					.leftColor(Color.WHITE)
 					.right(Integer.toString(StartLocations.translateRotation(rotationCol)))
 					.rightColor(Color.GREEN)
+					.build());
+
+			panelComponent.getChildren().add(LineComponent.builder()
+					.left("Server Minute:")
+					.leftColor(Color.WHITE)
+					.right(Integer.toString(plugin.getServerTime() % 60))
+					.rightColor(Color.ORANGE)
+					.build());
+
+			panelComponent.getChildren().add(LineComponent.builder()
+					.left("Server Seconds:")
+					.leftColor(Color.WHITE)
+					.right(Integer.toString(plugin.getServerSeconds()))
+					.rightColor(Color.ORANGE)
 					.build());
 		}
 

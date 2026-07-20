@@ -27,11 +27,11 @@ package com.spawnpredictor.overlays;
 
 import com.spawnpredictor.SpawnPredictorConfig;
 import com.spawnpredictor.SpawnPredictorPlugin;
+import com.spawnpredictor.util.StartLocations;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Point;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayPosition;
-import net.runelite.client.ui.overlay.OverlayPriority;
 import net.runelite.client.ui.overlay.OverlayUtil;
 
 import javax.inject.Inject;
@@ -49,7 +49,6 @@ public class SpawnPredictorOverlay extends Overlay
 		this.plugin = plugin;
 		this.config = config;
 
-		setPriority(OverlayPriority.HIGH);
 		setPosition(OverlayPosition.DYNAMIC);
 	}
 
@@ -66,10 +65,16 @@ public class SpawnPredictorOverlay extends Overlay
 			String text;
 			Color textColor;
 
-			if (!plugin.isServerUTCTimeSecondSet() || plugin.isActiveSafetyNet())
+			if (!plugin.hasServerTime())
 			{
-				text = "Please wait for the plugin to " + (plugin.isActiveSafetyNet() ? "confirm" : "determine") + " the rotation.";
+				text = "Please wait for the plugin to acquire the server time.";
 				textColor = Color.YELLOW;
+			}
+			else if (plugin.isNearMinuteChange())
+			{
+				int nextRotation = (plugin.getRotationCol() + 1) > 15 ? 4 : StartLocations.translateRotation(plugin.getRotationCol() + 1);
+				text = "Changing to Rotation " + nextRotation + " in " + plugin.getSecondsToMinuteChange() + " seconds";
+				textColor = Color.ORANGE;
 			}
 			else
 			{
